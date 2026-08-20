@@ -16,6 +16,7 @@ export const BottomNav: React.FC<BottomNavProps> = ({
   const navItems: {
     route: PageRoute;
     label: string;
+    shortLabel: string;
     icon: React.ComponentType<{ className?: string }>;
     activeBg: string;
     activeText: string;
@@ -26,6 +27,7 @@ export const BottomNav: React.FC<BottomNavProps> = ({
     {
       route: 'home',
       label: 'Beranda',
+      shortLabel: 'Beranda',
       icon: Plane,
       activeBg: 'bg-amber-100',
       activeText: 'text-amber-950',
@@ -36,6 +38,7 @@ export const BottomNav: React.FC<BottomNavProps> = ({
     {
       route: 'peta',
       label: 'Peta Petualangan',
+      shortLabel: 'Peta',
       icon: Map,
       activeBg: 'bg-emerald-100',
       activeText: 'text-emerald-950',
@@ -46,6 +49,7 @@ export const BottomNav: React.FC<BottomNavProps> = ({
     {
       route: 'game',
       label: 'Mini-Game',
+      shortLabel: 'Game',
       icon: Gamepad2,
       activeBg: 'bg-indigo-100',
       activeText: 'text-indigo-950',
@@ -56,6 +60,7 @@ export const BottomNav: React.FC<BottomNavProps> = ({
     {
       route: 'profil',
       label: 'Profil Pilot',
+      shortLabel: 'Profil',
       icon: User,
       activeBg: 'bg-rose-100',
       activeText: 'text-rose-950',
@@ -104,11 +109,12 @@ export const BottomNav: React.FC<BottomNavProps> = ({
 
                 {/* Clear, Bold Text Label */}
                 <span
-                  className={`text-[11px] sm:text-sm font-heading tracking-tight text-center leading-tight sm:leading-normal ${
+                  className={`text-[10px] sm:text-sm font-heading tracking-tight text-center leading-tight sm:leading-normal truncate ${
                     isActive ? 'font-black' : 'font-bold'
                   }`}
                 >
-                  {item.label}
+                  <span className="sm:hidden">{item.shortLabel}</span>
+                  <span className="hidden sm:inline">{item.label}</span>
                 </span>
 
                 {/* Subtle active indicator dot for small screens */}

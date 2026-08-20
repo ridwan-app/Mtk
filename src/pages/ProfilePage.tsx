@@ -664,12 +664,12 @@ export const ProfilePage: React.FC<ProfilePageProps> = ({
       {/* Modal Konfirmasi Reset Progres */}
       <AnimatePresence>
         {isResetModalOpen && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-xs">
+          <div className="fixed inset-0 z-50 overflow-y-auto p-3 sm:p-4 bg-slate-900/60 backdrop-blur-xs flex min-h-full items-center justify-center">
             <motion.div
               initial={{ scale: 0.9, opacity: 0, y: 20 }}
               animate={{ scale: 1, opacity: 1, y: 0 }}
               exit={{ scale: 0.9, opacity: 0, y: 20 }}
-              className="bg-white rounded-3xl p-6 max-w-md w-full border-3 border-rose-300 shadow-2xl space-y-4"
+              className="bg-white rounded-3xl p-6 max-w-md w-full border-3 border-rose-300 shadow-2xl space-y-4 my-auto"
             >
               <div className="flex items-center space-x-3 text-rose-600">
                 <div className="w-12 h-12 rounded-2xl bg-rose-100 border-2 border-rose-300 flex items-center justify-center shrink-0">

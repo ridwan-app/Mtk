@@ -80,13 +80,13 @@ export const PhaseChildSwitcherModal: React.FC<PhaseChildSwitcherModalProps> = (
 
   return (
     <AnimatePresence>
-      <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-slate-900/50 backdrop-blur-xs">
+      <div className="fixed inset-0 z-50 overflow-y-auto p-3 sm:p-4 bg-slate-900/60 backdrop-blur-xs flex min-h-full items-center justify-center">
         <motion.div
           id="phase-child-switcher-modal"
           initial={{ scale: 0.92, opacity: 0, y: 15 }}
           animate={{ scale: 1, opacity: 1, y: 0 }}
           exit={{ scale: 0.92, opacity: 0, y: 15 }}
-          className="w-full max-w-xl bg-[#FFFDF9] rounded-3xl shadow-2xl overflow-hidden border-3 border-amber-300 flex flex-col max-h-[90vh]"
+          className="w-full max-w-xl bg-[#FFFDF9] rounded-3xl shadow-2xl overflow-hidden border-3 border-amber-300 flex flex-col max-h-[92vh] my-auto"
         >
           {/* Header */}
           <div className="bg-gradient-to-r from-amber-400 via-orange-400 to-amber-500 p-4 sm:p-5 text-slate-900 relative shrink-0">

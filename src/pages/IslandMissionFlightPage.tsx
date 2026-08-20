@@ -259,8 +259,8 @@ export const IslandMissionFlightPage: React.FC<IslandMissionFlightPageProps> = (
 
       </div>
 
-      {/* 2. Compact 1-Row Cultural Strip (Gambar Rumah Adat & Keterangan Budaya 1 Baris) */}
-      <div className="bg-gradient-to-r from-amber-50 via-white to-amber-50 rounded-2xl px-3.5 py-2.5 border-2 border-amber-200/90 shadow-xs flex items-center justify-between gap-3">
+      {/* 2. Compact Cultural Strip (Gambar Rumah Adat & Keterangan Budaya) */}
+      <div className="bg-gradient-to-r from-amber-50 via-white to-amber-50 rounded-2xl px-3.5 py-2.5 border-2 border-amber-200/90 shadow-xs flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 sm:gap-3">
         <div className="flex items-center space-x-3 min-w-0">
           <div className="w-10 h-10 rounded-xl bg-amber-100 border border-amber-300 flex items-center justify-center shrink-0 shadow-2xs overflow-hidden">
             <NusantaraCulturalIcon nameOrId={currentIsland.name || currentIsland.culturalMotif.title} size="sm" />
@@ -270,7 +270,7 @@ export const IslandMissionFlightPage: React.FC<IslandMissionFlightPageProps> = (
               <span className="text-xs font-heading font-black text-slate-800 truncate">
                 {currentIsland.culturalMotif.title}
               </span>
-              <span className="hidden md:inline-block text-[10px] font-bold text-amber-700 bg-amber-100/70 px-2 py-0.5 rounded-md border border-amber-200">
+              <span className="text-[10px] font-bold text-amber-700 bg-amber-100/70 px-2 py-0.5 rounded-md border border-amber-200">
                 Budaya Nusantara
               </span>
             </div>
@@ -280,12 +280,12 @@ export const IslandMissionFlightPage: React.FC<IslandMissionFlightPageProps> = (
           </div>
         </div>
 
-        {/* Petunjuk Kiko Button in the header strip */}
+        {/* Petunjuk Kiko Button */}
         {!isAnswerSubmitted && currentQ.hint && (
           <button
             type="button"
             onClick={() => setShowHint(!showHint)}
-            className="shrink-0 text-xs font-heading font-black text-amber-900 bg-amber-200/80 hover:bg-amber-300 px-3 py-1.5 rounded-xl border border-amber-400 flex items-center space-x-1.5 cursor-pointer transition-colors shadow-2xs active:scale-95"
+            className="self-end sm:self-auto shrink-0 text-xs font-heading font-black text-amber-900 bg-amber-200/80 hover:bg-amber-300 px-3 py-1.5 rounded-xl border border-amber-400 flex items-center space-x-1.5 cursor-pointer transition-colors shadow-2xs active:scale-95"
             title="Minta Petunjuk Maskot Kiko"
           >
             <HelpCircle className="w-3.5 h-3.5 text-amber-900" />

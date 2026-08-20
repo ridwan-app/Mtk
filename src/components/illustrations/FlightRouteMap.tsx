@@ -1,8 +1,8 @@
-import React, { useRef, useEffect } from 'react';
+import React, { useRef, useEffect, useState } from 'react';
 import { Island, ChildProgress } from '../../types';
 import { PHASES } from '../../data/mockData';
 import { soundManager } from '../../utils/audio';
-import { Plane, Star, Lock, ChevronRight, ChevronLeft, Wind, Navigation } from 'lucide-react';
+import { Plane, Star, Lock, ChevronUp, ChevronDown, Target, Sparkles, Navigation } from 'lucide-react';
 import { motion } from 'motion/react';
 import { NusantaraCulturalIcon } from './NusantaraCulturalIcon';
 
@@ -20,6 +20,35 @@ export const FlightRouteMap: React.FC<FlightRouteMapProps> = ({
   onStartFlight: _onStartFlight,
 }) => {
   const containerRef = useRef<HTMLDivElement>(null);
+  const [containerWidth, setContainerWidth] = useState<number>(760);
+
+  // Measure container width dynamically for pixel-perfect responsive alignment on both mobile & desktop
+  useEffect(() => {
+    const updateDimensions = () => {
+      if (containerRef.current) {
+        const measured = containerRef.current.clientWidth;
+        if (measured > 0) {
+          setContainerWidth(measured);
+        }
+      }
+    };
+
+    updateDimensions();
+
+    const ro = new ResizeObserver(() => {
+      updateDimensions();
+    });
+
+    if (containerRef.current) {
+      ro.observe(containerRef.current);
+    }
+
+    window.addEventListener('resize', updateDimensions);
+    return () => {
+      ro.disconnect();
+      window.removeEventListener('resize', updateDimensions);
+    };
+  }, []);
 
   // Active Phase info
   const activePhase = PHASES.find((p) => p.id === progress.phaseId) || PHASES[0];
@@ -27,78 +56,131 @@ export const FlightRouteMap: React.FC<FlightRouteMapProps> = ({
   // Sort islands strictly by order (1 to N)
   const sortedIslands = [...islands].sort((a, b) => a.order - b.order);
 
-  // Dynamic canvas width based on number of islands
-  const MAP_WIDTH = sortedIslands.length > 6 ? 2500 : 2000;
-  const MAP_HEIGHT = 760;
+  // Responsive layout measurements
+  const isMobile = containerWidth < 520;
+  
+  const MAP_WIDTH = containerWidth;
+  const STEP_HEIGHT = isMobile ? 220 : 260;
+  const TOP_PADDING = isMobile ? 150 : 180;
+  const BOTTOM_PADDING = isMobile ? 160 : 200;
+  const MAP_HEIGHT = TOP_PADDING + Math.max(1, sortedIslands.length - 1) * STEP_HEIGHT + BOTTOM_PADDING;
 
-  // Find active island to center the scroll on initial load
+  // Safe margin calculations so cards never clip or overflow screen boundaries
+  const cardHalfWidth = isMobile ? 68 : 88;
+  const safeMargin = cardHalfWidth + 12;
+
+  // Calculate coordinates for each island climbing vertically (Tahap 1 at bottom, Tahap N at top)
+  const islandPositions = sortedIslands.map((island, index) => {
+    // Y-coordinate: Bottom is Index 0 (Tahap 1), Top is Index N-1 (Tahap Terakhir)
+    const posY = MAP_HEIGHT - BOTTOM_PADDING - index * STEP_HEIGHT;
+
+    // X-coordinate: Alternating zig-zag curve safely centered for organic flight path
+    const isEven = index % 2 === 0;
+    
+    // Left column vs Right column anchor
+    let posX: number;
+    if (isEven) {
+      posX = Math.max(safeMargin, MAP_WIDTH * (isMobile ? 0.27 : 0.32));
+    } else {
+      posX = Math.min(MAP_WIDTH - safeMargin, MAP_WIDTH * (isMobile ? 0.73 : 0.68));
+    }
+
+    return {
+      island,
+      index,
+      posX,
+      posY,
+      altitudeFeet: 5000 + index * 5000,
+    };
+  });
+
+  // Find active island to center the vertical scroll on initial load
   const currentActiveIsland =
     sortedIslands.find((i) => i.order === progress.currentIslandOrder) || sortedIslands[0];
+  const activePosition =
+    islandPositions.find((p) => p.island.id === currentActiveIsland?.id) || islandPositions[0];
 
-  useEffect(() => {
-    if (containerRef.current && currentActiveIsland) {
-      const targetX = (currentActiveIsland.mapCoords.xPercent / 100) * MAP_WIDTH;
-      const scrollTarget = targetX - containerRef.current.clientWidth / 2;
-      containerRef.current.scrollTo({ left: Math.max(0, scrollTarget), behavior: 'smooth' });
-    }
-  }, [currentActiveIsland?.id, MAP_WIDTH]);
-
-  const scrollMap = (direction: 'left' | 'right') => {
+  const scrollToPosition = (targetY: number) => {
     if (containerRef.current) {
-      const offset = direction === 'left' ? -420 : 420;
-      containerRef.current.scrollBy({ left: offset, behavior: 'smooth' });
+      const containerHeight = containerRef.current.clientHeight;
+      const scrollTarget = targetY - containerHeight / 2;
+      containerRef.current.scrollTo({
+        top: Math.max(0, scrollTarget),
+        behavior: 'smooth',
+      });
     }
   };
 
-  // Generate dynamic, mathematically curved high-altitude flight routes (Sky Airways)
-  const flightPaths = sortedIslands.slice(0, -1).map((currentIsland, index) => {
-    const nextIsland = sortedIslands[index + 1];
+  const focusActiveMission = () => {
+    if (activePosition) {
+      soundManager.playClick();
+      scrollToPosition(activePosition.posY);
+    }
+  };
 
-    const x1 = (currentIsland.mapCoords.xPercent / 100) * MAP_WIDTH;
-    const y1 = (currentIsland.mapCoords.yPercent / 100) * MAP_HEIGHT;
-    const x2 = (nextIsland.mapCoords.xPercent / 100) * MAP_WIDTH;
-    const y2 = (nextIsland.mapCoords.yPercent / 100) * MAP_HEIGHT;
+  useEffect(() => {
+    if (activePosition) {
+      const timer = setTimeout(() => {
+        scrollToPosition(activePosition.posY);
+      }, 150);
+      return () => clearTimeout(timer);
+    }
+  }, [activePosition?.island.id, MAP_HEIGHT]);
 
-    // Calculate midpoint and distance
-    const mx = (x1 + x2) / 2;
-    const my = (y1 + y2) / 2;
-    const dx = x2 - x1;
-    const dy = y2 - y1;
-    const dist = Math.sqrt(dx * dx + dy * dy);
+  const scrollMapVertical = (direction: 'up' | 'down') => {
+    if (containerRef.current) {
+      soundManager.playClick();
+      const offset = direction === 'up' ? -320 : 320;
+      containerRef.current.scrollBy({ top: offset, behavior: 'smooth' });
+    }
+  };
 
-    // Natural curved aviation flight arc (arching upward in the sky)
-    const curvature = Math.min(130, Math.max(50, dist * 0.24));
-    const cx = mx;
-    const cy = my - curvature;
+  // Generate dynamic, firm & bold flight routes connecting each island vertically
+  const flightPaths = islandPositions.slice(0, -1).map((currentPos, index) => {
+    const nextPos = islandPositions[index + 1];
 
-    // Angle of flight vector
-    const angleRad = Math.atan2(dy, dx);
+    const x1 = currentPos.posX;
+    const y1 = currentPos.posY;
+    const x2 = nextPos.posX;
+    const y2 = nextPos.posY;
+
+    // Cubic Bézier S-curve connecting upwards
+    const dy = y2 - y1; // negative value since y2 is higher
+    const cp1x = x1;
+    const cp1y = y1 + dy * 0.5;
+    const cp2x = x2;
+    const cp2y = y1 + dy * 0.5;
+
+    const d = `M ${x1} ${y1} C ${cp1x} ${cp1y}, ${cp2x} ${cp2y}, ${x2} ${y2}`;
+
+    // Midpoint on cubic curve at t = 0.5
+    const midX = 0.125 * x1 + 0.375 * cp1x + 0.375 * cp2x + 0.125 * x2;
+    const midY = 0.125 * y1 + 0.375 * cp1y + 0.375 * cp2y + 0.125 * y2;
+
+    // Flight vector angle pointing towards next destination
+    const angleRad = Math.atan2(y2 - y1, x2 - x1);
     const angleDeg = (angleRad * 180) / Math.PI;
 
-    // Midpoint along quadratic curve (t = 0.5)
-    const midCurveX = 0.25 * x1 + 0.5 * cx + 0.25 * x2;
-    const midCurveY = 0.25 * y1 + 0.5 * cy + 0.25 * y2;
-
-    const isCurrentCompleted = progress.completedIslands.includes(currentIsland.id);
-    const isNextCompleted = progress.completedIslands.includes(nextIsland.id);
-    const isSegmentCompleted = isCurrentCompleted && (isNextCompleted || nextIsland.order === progress.currentIslandOrder);
+    const isCurrentCompleted = progress.completedIslands.includes(currentPos.island.id);
+    const isNextCompleted = progress.completedIslands.includes(nextPos.island.id);
+    const isSegmentCompleted = isCurrentCompleted && (isNextCompleted || nextPos.island.order === progress.currentIslandOrder);
     const isSegmentActive =
-      (currentIsland.order === progress.currentIslandOrder || isCurrentCompleted) &&
-      nextIsland.order === progress.currentIslandOrder;
+      (currentPos.island.order === progress.currentIslandOrder || isCurrentCompleted) &&
+      nextPos.island.order === progress.currentIslandOrder;
 
     return {
-      id: `route-${currentIsland.id}-to-${nextIsland.id}`,
-      d: `M ${x1} ${y1} Q ${cx} ${cy}, ${x2} ${y2}`,
-      fromOrder: currentIsland.order,
-      toOrder: nextIsland.order,
-      fromName: currentIsland.name,
-      toName: nextIsland.name,
+      id: `route-${currentPos.island.id}-to-${nextPos.island.id}`,
+      d,
+      fromOrder: currentPos.island.order,
+      toOrder: nextPos.island.order,
+      fromName: currentPos.island.name,
+      toName: nextPos.island.name,
       x1,
       y1,
       x2,
       y2,
-      midCurveX,
-      midCurveY,
+      midX,
+      midY,
       angleDeg,
       isSegmentCompleted,
       isSegmentActive,
@@ -107,234 +189,226 @@ export const FlightRouteMap: React.FC<FlightRouteMapProps> = ({
   });
 
   return (
-    <div className="relative w-full rounded-3xl overflow-hidden shadow-2xl border-4 border-amber-300 select-none bg-[#0369A1]">
+    <div className="relative w-full rounded-3xl overflow-hidden shadow-2xl border-3 sm:border-4 border-amber-300 select-none bg-[#0369A1]">
       
-      {/* 1. Floating Flight Cockpit HUD Overlay */}
-      <div className="absolute top-4 left-4 right-4 z-30 flex items-center justify-between pointer-events-none">
+      {/* 1. Floating Flight Cockpit HUD Header Overlay */}
+      <div className="sticky top-2 sm:top-3 z-30 px-2 sm:px-4 flex items-center justify-between pointer-events-none gap-2">
         
-        {/* Left Badge: Flight Altitude & Phase Info */}
-        <div className="pointer-events-auto bg-white/95 backdrop-blur-md px-4 py-2.5 rounded-2xl border-2 border-amber-300 shadow-xl flex items-center space-x-3">
-          <div className="w-11 h-11 rounded-2xl bg-gradient-to-br from-amber-400 to-orange-500 text-white flex items-center justify-center font-bold text-2xl shadow-xs shrink-0">
-            <Plane className="w-6 h-6 transform -rotate-45" />
+        {/* Left Badge: Flight Info */}
+        <div className="pointer-events-auto bg-white/95 backdrop-blur-md px-2.5 py-1.5 sm:px-4 sm:py-2.5 rounded-2xl border-2 border-amber-300 shadow-xl flex items-center space-x-2 sm:space-x-3 min-w-0">
+          <div className="w-8 h-8 sm:w-11 sm:h-11 rounded-xl sm:rounded-2xl bg-gradient-to-br from-amber-400 to-orange-500 text-white flex items-center justify-center font-bold text-base sm:text-xl shadow-xs shrink-0">
+            <Plane className="w-4 h-4 sm:w-6 sm:h-6 transform -rotate-45" />
           </div>
-          <div>
-            <div className="flex items-center space-x-2">
-              <span className="font-heading font-black text-slate-900 text-xs sm:text-sm tracking-tight">
-                Jalur Penerbangan Udara • {activePhase.title}
+          <div className="min-w-0">
+            <div className="flex items-center space-x-1 sm:space-x-2">
+              <span className="font-heading font-black text-slate-900 text-[11px] sm:text-sm tracking-tight truncate">
+                {activePhase.title}
               </span>
-              <span className="text-[11px] font-heading font-black bg-amber-100 text-amber-900 px-2.5 py-0.5 rounded-full border border-amber-300">
-                {progress.completedIslands.length}/{sortedIslands.length} Pulau Tuntas ✈️
+              <span className="text-[9px] sm:text-[11px] font-heading font-black bg-amber-100 text-amber-900 px-1.5 sm:px-2 py-0.5 rounded-full border border-amber-300 shrink-0">
+                {progress.completedIslands.length}/{sortedIslands.length} ✈️
               </span>
             </div>
-            <p className="text-[10px] text-slate-600 font-bold hidden sm:flex items-center space-x-2 mt-0.5">
-              <span>✈️ Ketinggian Jelajah: 28.000 Kaki</span>
-              <span>•</span>
-              <span>Cuaca: Cerah Berawan ⛅</span>
+            <p className="text-[9px] text-slate-600 font-bold hidden sm:flex items-center space-x-1.5 mt-0.5">
+              <span>🚀 Geser ke atas untuk terbang ke pulau berikutnya!</span>
             </p>
           </div>
         </div>
 
-        {/* Right Badge: Navigation Controls & Wind Compass */}
-        <div className="pointer-events-auto flex items-center space-x-2">
+        {/* Right Badge: Vertical Quick Jump Controls */}
+        <div className="pointer-events-auto flex items-center space-x-1 sm:space-x-2 shrink-0">
+          
+          {/* Focus on My Active Position Button */}
           <button
             type="button"
-            id="map-scroll-left-btn"
-            onClick={() => scrollMap('left')}
-            className="w-11 h-11 rounded-2xl bg-white/95 hover:bg-white text-slate-800 border-2 border-amber-300 shadow-lg flex items-center justify-center cursor-pointer transition-all active:scale-95"
-            title="Geser Peta ke Barat (Kiri)"
+            id="focus-active-island-btn"
+            onClick={focusActiveMission}
+            className="px-2.5 py-1.5 sm:px-3 sm:py-2.5 rounded-xl sm:rounded-2xl bg-amber-400 hover:bg-amber-300 text-amber-950 border-2 border-amber-500 shadow-lg flex items-center space-x-1 cursor-pointer transition-all active:scale-95 text-[11px] sm:text-xs font-heading font-black min-h-[38px] sm:min-h-[44px]"
+            title="Arahkan Peta ke Misi Aktif Saya"
           >
-            <ChevronLeft className="w-6 h-6 text-amber-900" />
+            <Target className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-amber-950" />
+            <span className="hidden xs:inline sm:inline">Misi Saya</span>
           </button>
+
+          {/* Scroll Up Button */}
           <button
             type="button"
-            id="map-scroll-right-btn"
-            onClick={() => scrollMap('right')}
-            className="w-11 h-11 rounded-2xl bg-white/95 hover:bg-white text-slate-800 border-2 border-amber-300 shadow-lg flex items-center justify-center cursor-pointer transition-all active:scale-95"
-            title="Geser Peta ke Timur (Kanan)"
+            id="map-scroll-up-btn"
+            onClick={() => scrollMapVertical('up')}
+            className="w-9 h-9 sm:w-11 sm:h-11 rounded-xl sm:rounded-2xl bg-white/95 hover:bg-white text-slate-800 border-2 border-amber-300 shadow-lg flex items-center justify-center cursor-pointer transition-all active:scale-95 min-h-[38px] sm:min-h-[44px]"
+            title="Geser Peta ke Atas (Pulau Berikutnya)"
           >
-            <ChevronRight className="w-6 h-6 text-amber-900" />
+            <ChevronUp className="w-5 h-5 sm:w-6 sm:h-6 text-amber-900" />
+          </button>
+
+          {/* Scroll Down Button */}
+          <button
+            type="button"
+            id="map-scroll-down-btn"
+            onClick={() => scrollMapVertical('down')}
+            className="w-9 h-9 sm:w-11 sm:h-11 rounded-xl sm:rounded-2xl bg-white/95 hover:bg-white text-slate-800 border-2 border-amber-300 shadow-lg flex items-center justify-center cursor-pointer transition-all active:scale-95 min-h-[38px] sm:min-h-[44px]"
+            title="Geser Peta ke Bawah (Pulau Sebelumnya)"
+          >
+            <ChevronDown className="w-5 h-5 sm:w-6 sm:h-6 text-amber-900" />
           </button>
         </div>
       </div>
 
-      {/* 2. Full-Bleed Scrollable Sky Flight Canvas */}
+      {/* 2. Vertical Scrollable Sky Adventure Canvas */}
       <div
         ref={containerRef}
-        className="w-full overflow-x-auto overflow-y-hidden cursor-grab active:cursor-grabbing scrollbar-none"
+        className="w-full max-h-[76vh] sm:max-h-[78vh] overflow-y-auto overflow-x-hidden scrollbar-none relative"
         style={{ scrollBehavior: 'smooth' }}
       >
         <div
-          className="relative bg-gradient-to-b from-[#0284C7] via-[#38BDF8] to-[#BAE6FD] overflow-hidden"
-          style={{ width: `${MAP_WIDTH}px`, height: `${MAP_HEIGHT}px` }}
+          className="relative mx-auto bg-gradient-to-t from-[#0369A1] via-[#0284C7] via-50% via-[#38BDF8] via-80% to-[#1E1B4B] overflow-hidden"
+          style={{ width: '100%', height: `${MAP_HEIGHT}px` }}
         >
-          {/* A. Sky & Atmospheric Wind Currents SVG */}
+          {/* A. Atmospheric Background Altitude Bands & SVG Radar Grid */}
           <svg
-            className="absolute inset-0 w-full h-full pointer-events-none opacity-60"
+            className="absolute inset-0 w-full h-full pointer-events-none opacity-50"
+            viewBox={`0 0 ${MAP_WIDTH} ${MAP_HEIGHT}`}
             xmlns="http://www.w3.org/2000/svg"
           >
             <defs>
-              {/* Flight Altitude Radar Grid */}
-              <pattern id="sky-radar-grid" width="120" height="120" patternUnits="userSpaceOnUse">
-                <circle cx="60" cy="60" r="50" fill="none" stroke="#FFFFFF" strokeWidth="0.8" strokeDasharray="3 4" opacity="0.25" />
-                <path d="M 60 0 L 60 120 M 0 60 L 120 60" stroke="#FFFFFF" strokeWidth="0.6" strokeDasharray="2 3" opacity="0.15" />
+              <pattern id="vert-radar-grid" width="100" height="100" patternUnits="userSpaceOnUse">
+                <circle cx="50" cy="50" r="45" fill="none" stroke="#FFFFFF" strokeWidth="0.8" strokeDasharray="3 4" opacity="0.2" />
+                <path d="M 50 0 L 50 100 M 0 50 L 100 50" stroke="#FFFFFF" strokeWidth="0.6" strokeDasharray="2 3" opacity="0.12" />
               </pattern>
 
-              {/* Jet Stream Gradient */}
-              <linearGradient id="jetstream-grad" x1="0%" y1="0%" x2="100%" y2="0%">
+              <linearGradient id="stream-upward" x1="0%" y1="100%" x2="0%" y2="0%">
                 <stop offset="0%" stopColor="#FFFFFF" stopOpacity="0.0" />
-                <stop offset="50%" stopColor="#FFFFFF" stopOpacity="0.35" />
+                <stop offset="50%" stopColor="#FFFFFF" stopOpacity="0.3" />
                 <stop offset="100%" stopColor="#FFFFFF" stopOpacity="0.0" />
               </linearGradient>
             </defs>
 
-            <rect width="100%" height="100%" fill="url(#sky-radar-grid)" />
+            <rect width="100%" height="100%" fill="url(#vert-radar-grid)" />
 
-            {/* High-Altitude Wind / Jet Streams */}
+            {/* Vertical Atmospheric Jet Currents */}
             <path
-              d="M -50 140 Q 400 80, 850 160 T 1700 120 T 2600 150"
+              d={`M ${MAP_WIDTH * 0.15} 0 Q ${MAP_WIDTH * 0.1} 400, ${MAP_WIDTH * 0.18} 800 T ${MAP_WIDTH * 0.12} 1600 T ${MAP_WIDTH * 0.16} 2400`}
               fill="none"
-              stroke="url(#jetstream-grad)"
-              strokeWidth="16"
+              stroke="url(#stream-upward)"
+              strokeWidth={isMobile ? 16 : 24}
               strokeLinecap="round"
             />
             <path
-              d="M 100 480 Q 600 420, 1100 500 T 1950 460 T 2600 520"
+              d={`M ${MAP_WIDTH * 0.85} 0 Q ${MAP_WIDTH * 0.9} 400, ${MAP_WIDTH * 0.82} 800 T ${MAP_WIDTH * 0.88} 1600 T ${MAP_WIDTH * 0.84} 2400`}
               fill="none"
-              stroke="url(#jetstream-grad)"
-              strokeWidth="20"
-              strokeLinecap="round"
-            />
-            <path
-              d="M 0 620 Q 500 560, 1000 640 T 1800 600 T 2600 630"
-              fill="none"
-              stroke="url(#jetstream-grad)"
-              strokeWidth="12"
+              stroke="url(#stream-upward)"
+              strokeWidth={isMobile ? 18 : 28}
               strokeLinecap="round"
             />
           </svg>
 
-          {/* B. Floating Fluffy Clouds & Aviation Sky Assets */}
-          {/* Cloud Group 1 */}
-          <div className="absolute top-12 left-16 text-6xl opacity-90 animate-float pointer-events-none select-none drop-shadow-md">
-            ☁️
-          </div>
-          <div
-            className="absolute top-28 left-[22%] text-7xl opacity-85 animate-float pointer-events-none select-none drop-shadow-md"
-            style={{ animationDelay: '1.8s' }}
-          >
-            ☁️
-          </div>
-          <div
-            className="absolute bottom-20 left-[18%] text-5xl opacity-80 animate-float pointer-events-none select-none drop-shadow-md"
-            style={{ animationDelay: '3.2s' }}
-          >
-            ☁️
-          </div>
-          <div
-            className="absolute top-10 left-[48%] text-8xl opacity-90 animate-float pointer-events-none select-none drop-shadow-md"
-            style={{ animationDelay: '0.8s' }}
-          >
-            ☁️
-          </div>
-          <div
-            className="absolute bottom-24 left-[58%] text-6xl opacity-85 animate-float pointer-events-none select-none drop-shadow-md"
-            style={{ animationDelay: '2.4s' }}
-          >
-            ☁️
-          </div>
-          <div
-            className="absolute top-16 left-[76%] text-7xl opacity-90 animate-float pointer-events-none select-none drop-shadow-md"
-            style={{ animationDelay: '1.4s' }}
-          >
-            ☁️
-          </div>
-          <div
-            className="absolute bottom-16 right-20 text-8xl opacity-90 animate-float pointer-events-none select-none drop-shadow-md"
-            style={{ animationDelay: '3.6s' }}
-          >
-            ☁️
-          </div>
-
-          {/* Hot Air Balloons, Birds & Sunlight Elements */}
-          <div
-            className="absolute top-14 left-[32%] text-4xl animate-bounce pointer-events-none select-none drop-shadow-md"
-            style={{ animationDuration: '4s' }}
-          >
-            🎈
-          </div>
-          <div
-            className="absolute top-32 left-[66%] text-4xl animate-bounce pointer-events-none select-none drop-shadow-md"
-            style={{ animationDuration: '5s' }}
-          >
-            🎈
-          </div>
-          <div className="absolute top-8 right-[28%] text-3xl pointer-events-none select-none opacity-80">
-            🦅
-          </div>
-          <div className="absolute bottom-36 left-[8%] text-3xl pointer-events-none select-none opacity-80">
-            🕊️
-          </div>
-          <div className="absolute top-6 right-10 text-5xl pointer-events-none select-none animate-pulse">
-            ☀️
-          </div>
-
-          {/* Aviation Compass Rose HUD */}
-          <div className="absolute bottom-8 left-8 pointer-events-none opacity-90 z-10">
-            <div className="w-22 h-22 rounded-full bg-white/30 backdrop-blur-md border-2 border-white/60 flex items-center justify-center relative shadow-lg">
-              <span className="absolute -top-3 text-[11px] font-heading font-black text-white bg-orange-600 px-1.5 py-0.2 rounded-md shadow-xs">
-                U (North)
-              </span>
-              <span className="absolute -bottom-3 text-[10px] font-heading font-black text-sky-950">
-                S
-              </span>
-              <span className="absolute -right-3 text-[10px] font-heading font-black text-sky-950">
-                T
-              </span>
-              <span className="absolute -left-3 text-[10px] font-heading font-black text-sky-950">
-                B
-              </span>
-              <Navigation className="w-9 h-9 text-amber-300 drop-shadow-md transform -rotate-45" />
+          {/* B. Altitude Markers & Sky Landmarks */}
+          {/* 1. Puncak Angkasa (Top Milestone) */}
+          <div className="absolute top-6 left-1/2 -translate-x-1/2 z-10 flex flex-col items-center text-center pointer-events-none w-11/12 max-w-sm">
+            <div className="bg-indigo-900/90 text-amber-300 px-3.5 py-1 sm:px-4 sm:py-1.5 rounded-full border-2 border-amber-400 shadow-xl flex items-center space-x-1.5 text-[10px] sm:text-xs font-heading font-black animate-pulse">
+              <Sparkles className="w-3.5 h-3.5 text-amber-300 shrink-0" />
+              <span className="truncate">Puncak Angkasa Nusantara • 35.000 FT</span>
+              <Sparkles className="w-3.5 h-3.5 text-amber-300 shrink-0" />
+            </div>
+            <div className="flex items-center space-x-2 text-amber-200 text-xs sm:text-sm mt-1">
+              <span>🌟 Bintang Khatulistiwa 🌟</span>
             </div>
           </div>
 
-          {/* C. DYNAMIC PRECISION FLIGHT ROUTE SVG LAYER */}
+          {/* 2. Bandara Lepas Landas (Bottom Milestone) */}
+          <div className="absolute bottom-6 left-1/2 -translate-x-1/2 z-10 flex flex-col items-center text-center pointer-events-none w-11/12 max-w-sm">
+            <div className="bg-sky-900/90 text-white px-3.5 py-1 sm:px-4 sm:py-1.5 rounded-full border-2 border-amber-300 shadow-xl flex items-center space-x-1.5 text-[10px] sm:text-xs font-heading font-black">
+              <span>🛫</span>
+              <span className="truncate">Pangkalan Penerbang Nusantara</span>
+              <span>✈️</span>
+            </div>
+            <span className="text-[9px] sm:text-[10px] text-sky-200 font-bold mt-0.5">Mulai Petualangan dari Tahap 1</span>
+          </div>
+
+          {/* C. Decorative Floating Cloud Assets */}
+          {islandPositions.map((pos, idx) => {
+            const isLeft = idx % 2 === 0;
+            return (
+              <React.Fragment key={`deco-${pos.island.id}`}>
+                <div
+                  className="absolute text-4xl sm:text-6xl opacity-75 animate-float pointer-events-none select-none drop-shadow-md z-0"
+                  style={{
+                    top: `${pos.posY - 30}px`,
+                    [isLeft ? 'right' : 'left']: '4%',
+                    animationDelay: `${(idx * 0.7) % 3}s`,
+                  }}
+                >
+                  ☁️
+                </div>
+
+                {/* Altitude Tag on the side (desktop) */}
+                <div
+                  className="absolute z-0 pointer-events-none opacity-60 hidden md:flex items-center space-x-1 text-[10px] font-heading font-black text-white/90 bg-sky-950/40 px-2 py-0.5 rounded-md border border-white/20"
+                  style={{
+                    top: `${pos.posY}px`,
+                    [isLeft ? 'left' : 'right']: '3%',
+                  }}
+                >
+                  <Navigation className="w-3 h-3 text-amber-300 transform -rotate-45" />
+                  <span>{pos.altitudeFeet.toLocaleString('id-ID')} FT</span>
+                </div>
+              </React.Fragment>
+            );
+          })}
+
+          {/* D. SVG FLIGHT ROUTE LAYER (TEGAS, MENARIK, BOLD & GLOWING UPWARD) */}
           <svg
             className="absolute inset-0 w-full h-full pointer-events-none z-10"
             viewBox={`0 0 ${MAP_WIDTH} ${MAP_HEIGHT}`}
+            xmlns="http://www.w3.org/2000/svg"
           >
             <defs>
-              <filter id="routeGlowSky" x="-20%" y="-20%" width="140%" height="140%">
+              {/* Neon Glow Filter */}
+              <filter id="routeGlowSky" x="-30%" y="-30%" width="160%" height="160%">
                 <feGaussianBlur stdDeviation="5" result="blur" />
                 <feComposite in="SourceGraphic" in2="blur" operator="over" />
               </filter>
             </defs>
 
-            {/* Render each curved flight path */}
+            {/* Render each upward curved flight route segment */}
             {flightPaths.map((route) => {
               const strokeColor = route.isSegmentCompleted
-                ? '#10B981' // Completed flight: Emerald Green
+                ? '#10B981' // Completed: Emerald Green
                 : route.isSegmentActive
                 ? '#F59E0B' // Active mission: Brilliant Gold Amber
-                : '#E0F2FE'; // Upcoming airway: Soft Cloud White
+                : '#E0F2FE'; // Future airway: High-Contrast Crisp Cloud White
 
-              const strokeWidth = route.isSegmentActive ? 6 : route.isSegmentCompleted ? 5 : 4;
+              const strokeWidth = route.isSegmentActive
+                ? (isMobile ? 5 : 7)
+                : route.isSegmentCompleted
+                ? (isMobile ? 4.5 : 6)
+                : (isMobile ? 3.5 : 5);
               const strokeDash = route.isSegmentCompleted ? 'none' : '12 8';
 
               return (
                 <g key={route.id}>
-                  {/* Glowing halo trail */}
+                  {/* 1. Underlying Bold Shadow Outline for High Contrast */}
+                  <path
+                    d={route.d}
+                    fill="none"
+                    stroke="#0C4A6E"
+                    strokeWidth={strokeWidth + (isMobile ? 3 : 4)}
+                    strokeLinecap="round"
+                    opacity="0.6"
+                  />
+
+                  {/* 2. Glowing Halo for Active/Completed segments */}
                   {(route.isSegmentActive || route.isSegmentCompleted) && (
                     <path
                       d={route.d}
                       fill="none"
                       stroke={route.isSegmentCompleted ? '#34D399' : '#FBBF24'}
-                      strokeWidth={strokeWidth + 6}
-                      strokeOpacity="0.5"
+                      strokeWidth={strokeWidth + (isMobile ? 5 : 8)}
+                      strokeOpacity="0.6"
                       filter="url(#routeGlowSky)"
                     />
                   )}
 
-                  {/* Main Flight Path */}
+                  {/* 3. Main Flight Path (Firm, Crisp, Bold) */}
                   <path
                     d={route.d}
                     fill="none"
@@ -345,50 +419,70 @@ export const FlightRouteMap: React.FC<FlightRouteMapProps> = ({
                     className={route.isSegmentActive ? 'animate-pulse' : ''}
                   />
 
-                  {/* Waypoint circles */}
+                  {/* 4. Waypoint Node Dots */}
                   <circle
                     cx={route.x1}
                     cy={route.y1}
-                    r={route.isSegmentCompleted ? 8 : 6}
+                    r={route.isSegmentCompleted ? (isMobile ? 7 : 9) : (isMobile ? 5 : 7)}
                     fill={route.isSegmentCompleted ? '#10B981' : '#F59E0B'}
                     stroke="#FFFFFF"
-                    strokeWidth="2.5"
+                    strokeWidth={isMobile ? '2' : '3'}
                   />
                   <circle
                     cx={route.x2}
                     cy={route.y2}
-                    r={route.isSegmentCompleted ? 8 : 6}
+                    r={route.isSegmentCompleted ? (isMobile ? 7 : 9) : (isMobile ? 5 : 7)}
                     fill={route.isSegmentCompleted ? '#10B981' : '#F59E0B'}
                     stroke="#FFFFFF"
-                    strokeWidth="2.5"
+                    strokeWidth={isMobile ? '2' : '3'}
                   />
 
-                  {/* Animated Cruising Airplane along the curve */}
-                  <g
-                    transform={`translate(${route.midCurveX}, ${route.midCurveY}) rotate(${route.angleDeg})`}
-                  >
+                  {/* 5. Animated Directional Airplane Icon Mid-Flight */}
+                  <g transform={`translate(${route.midX}, ${route.midY}) rotate(${route.angleDeg})`}>
                     {route.isSegmentActive ? (
                       <g className="animate-bounce">
-                        {/* Glowing Active Airplane Pin */}
-                        <circle cx="0" cy="0" r="16" fill="#EA580C" stroke="#FFFFFF" strokeWidth="2.5" />
+                        <circle
+                          cx="0"
+                          cy="0"
+                          r={isMobile ? 14 : 18}
+                          fill="#F97316"
+                          stroke="#FFFFFF"
+                          strokeWidth={isMobile ? 2 : 3}
+                          className="drop-shadow-lg"
+                        />
                         <path
-                          d="M -5 -7 L 7 0 L -5 7 Z"
+                          d={isMobile ? "M -4 -6 L 6 0 L -4 6 Z" : "M -6 -8 L 8 0 L -6 8 Z"}
                           fill="#FFFFFF"
                         />
                       </g>
                     ) : route.isSegmentCompleted ? (
                       <g>
-                        <circle cx="0" cy="0" r="12" fill="#10B981" stroke="#FFFFFF" strokeWidth="2" />
+                        <circle
+                          cx="0"
+                          cy="0"
+                          r={isMobile ? 11 : 14}
+                          fill="#10B981"
+                          stroke="#FFFFFF"
+                          strokeWidth={isMobile ? 1.8 : 2.5}
+                          className="drop-shadow-md"
+                        />
                         <path
-                          d="M -3.5 -5 L 5 0 L -3.5 5 Z"
+                          d={isMobile ? "M -3 -4.5 L 4.5 0 L -3 4.5 Z" : "M -4 -6 L 6 0 L -4 6 Z"}
                           fill="#FFFFFF"
                         />
                       </g>
                     ) : (
-                      <g opacity="0.75">
-                        <circle cx="0" cy="0" r="9" fill="#0284C7" stroke="#FFFFFF" strokeWidth="1.5" />
+                      <g opacity="0.85">
+                        <circle
+                          cx="0"
+                          cy="0"
+                          r={isMobile ? 9 : 11}
+                          fill="#0284C7"
+                          stroke="#FFFFFF"
+                          strokeWidth={isMobile ? 1.5 : 2}
+                        />
                         <path
-                          d="M -2.5 -4 L 3.5 0 L -2.5 4 Z"
+                          d={isMobile ? "M -2.5 -3.5 L 3.5 0 L -2.5 3.5 Z" : "M -3 -5 L 5 0 L -3 5 Z"}
                           fill="#FFFFFF"
                         />
                       </g>
@@ -399,16 +493,13 @@ export const FlightRouteMap: React.FC<FlightRouteMapProps> = ({
             })}
           </svg>
 
-          {/* D. MAXIMIZED ISLAND PLATES & PROMINENT CULTURAL ICONS */}
-          {sortedIslands.map((island) => {
+          {/* E. RESPONSIVE ISLAND CARDS (SEMUA IKON, BUDAYA & TEMA ASLI DIPERTAHANKAN) */}
+          {islandPositions.map(({ island, posX, posY }) => {
             const isCompleted = progress.completedIslands.includes(island.id);
             const isCurrent = island.order === progress.currentIslandOrder && !isCompleted;
             const isLocked =
               !isCompleted && !isCurrent && island.status === 'locked' && island.order > 1;
             const stars = progress.islandStars[island.id] || 0;
-
-            const posX = (island.mapCoords.xPercent / 100) * MAP_WIDTH;
-            const posY = (island.mapCoords.yPercent / 100) * MAP_HEIGHT;
 
             return (
               <div
@@ -421,56 +512,56 @@ export const FlightRouteMap: React.FC<FlightRouteMapProps> = ({
                 className="absolute z-20"
               >
                 <motion.div
-                  whileHover={!isLocked ? { scale: 1.07 } : {}}
+                  whileHover={!isLocked ? { scale: 1.06 } : {}}
                   whileTap={!isLocked ? { scale: 0.95 } : {}}
                   onClick={() => {
                     soundManager.playClick();
                     onSelectIsland(island);
                   }}
                   className={`group relative cursor-pointer flex flex-col items-center transition-all ${
-                    isLocked ? 'opacity-70 filter grayscale-[70%]' : ''
+                    isLocked ? 'opacity-75 filter grayscale-[65%]' : ''
                   }`}
                 >
                   {/* Active Radar Ping Ripple Effect */}
                   {isCurrent && (
-                    <div className="absolute -inset-6 rounded-full bg-amber-400/40 animate-ping pointer-events-none" />
+                    <div className="absolute -inset-4 sm:-inset-6 rounded-full bg-amber-400/40 animate-ping pointer-events-none" />
                   )}
 
-                  {/* Island Frame Plate with MAXIMIZED ARTWORK & PROMINENT PRESENCE */}
+                  {/* Island Frame Plate with Original Maximized Cultural Motif Icon */}
                   <div className="relative">
                     
-                    {/* Generous Island Landmass Base Plate (Maximized Size & Contrast) */}
+                    {/* Generous Island Landmass Base Plate (Responsive sizing for mobile) */}
                     <div
-                      className={`w-40 h-32 sm:w-44 sm:h-36 rounded-3xl border-4 shadow-2xl flex flex-col items-center justify-between p-2.5 transition-all duration-300 overflow-hidden relative ${
+                      className={`w-[136px] h-[112px] sm:w-44 sm:h-36 rounded-2xl sm:rounded-3xl border-3 sm:border-4 shadow-xl sm:shadow-2xl flex flex-col items-center justify-between p-2 sm:p-2.5 transition-all duration-300 overflow-hidden relative ${
                         isCompleted
-                          ? 'bg-gradient-to-b from-[#ECFDF5] via-[#A7F3D0] to-[#059669] border-emerald-400 ring-4 ring-emerald-300/60 shadow-emerald-950/30'
+                          ? 'bg-gradient-to-b from-[#ECFDF5] via-[#A7F3D0] to-[#059669] border-emerald-400 ring-3 sm:ring-4 ring-emerald-300/60 shadow-emerald-950/30'
                           : isCurrent
-                          ? 'bg-gradient-to-b from-[#FFFBEB] via-[#FDE68A] to-[#D97706] border-amber-400 ring-4 ring-amber-400/80 shadow-orange-950/40 ring-offset-2 ring-offset-sky-400 animate-pulse'
+                          ? 'bg-gradient-to-b from-[#FFFBEB] via-[#FDE68A] to-[#D97706] border-amber-400 ring-3 sm:ring-4 ring-amber-400/90 shadow-orange-950/40 ring-offset-2 ring-offset-sky-400 animate-pulse'
                           : 'bg-gradient-to-b from-[#F8FAFC] via-[#CBD5E1] to-[#64748B] border-slate-300 shadow-slate-900/30'
                       }`}
                     >
-                      {/* Top Island Badge: Stage Number & Icon */}
+                      {/* Top Island Badge: Stage Number & Topic Icon */}
                       <div className="w-full flex items-center justify-between z-10">
-                        <span className="text-[11px] font-heading font-black text-slate-900 px-2.5 py-0.5 rounded-full bg-white/90 shadow-xs border border-amber-400/40">
+                        <span className="text-[9px] sm:text-[11px] font-heading font-black text-slate-900 px-2 sm:px-2.5 py-0.5 rounded-full bg-white/90 shadow-xs border border-amber-400/40">
                           Tahap {island.order}
                         </span>
-                        <span className="text-base filter drop-shadow-xs">
+                        <span className="text-sm sm:text-base filter drop-shadow-xs">
                           {island.icon}
                         </span>
                       </div>
 
-                      {/* MAXIMIZED CULTURAL ICON / ISLAND ARTWORK (Fills the Frame Prominently) */}
-                      <div className="my-auto transform group-hover:scale-110 transition-transform duration-200 z-10 flex items-center justify-center">
+                      {/* MAXIMIZED CULTURAL ICON / ISLAND ARTWORK */}
+                      <div className="my-auto transform group-hover:scale-105 transition-transform duration-200 z-10 flex items-center justify-center">
                         <NusantaraCulturalIcon
                           nameOrId={island.name || island.culturalMotif.title}
-                          size="lg"
+                          size={isMobile ? 'md' : 'lg'}
                           className="filter drop-shadow-md"
                         />
                       </div>
 
-                      {/* Tropical Ground Texture Accent */}
+                      {/* Cultural Landmark Subtitle Accent */}
                       <div className="w-full text-center z-10">
-                        <span className="text-[10px] font-heading font-black text-slate-800 bg-white/85 px-2 py-0.5 rounded-lg border border-slate-300/60 truncate block max-w-[140px] mx-auto">
+                        <span className="text-[9px] sm:text-[10px] font-heading font-black text-slate-800 bg-white/90 px-1.5 sm:px-2 py-0.5 rounded-md sm:rounded-lg border border-slate-300/60 truncate block max-w-[120px] sm:max-w-[150px] mx-auto">
                           {island.culturalMotif.title}
                         </span>
                       </div>
@@ -478,35 +569,35 @@ export const FlightRouteMap: React.FC<FlightRouteMapProps> = ({
 
                     {/* Parked Airplane on Active Mission Island */}
                     {isCurrent && (
-                      <div className="absolute -top-6 -right-4 z-30 animate-bounce pointer-events-none">
-                        <div className="bg-orange-500 text-white p-3 rounded-2xl border-2 border-white shadow-2xl flex items-center justify-center transform -rotate-12">
-                          <Plane className="w-6 h-6 fill-white transform -rotate-45" />
+                      <div className="absolute -top-4 -right-2 sm:-top-5 sm:-right-3 z-30 animate-bounce pointer-events-none">
+                        <div className="bg-orange-500 text-white p-2 sm:p-2.5 rounded-xl sm:rounded-2xl border-2 border-white shadow-2xl flex items-center justify-center transform -rotate-12">
+                          <Plane className="w-4 h-4 sm:w-5 sm:h-5 fill-white transform -rotate-45" />
                         </div>
                       </div>
                     )}
 
                     {/* Completed Island Stars Floating Badge */}
                     {isCompleted && (
-                      <div className="absolute -top-3 -right-2 z-30 bg-emerald-600 text-white px-3 py-1 rounded-full border-2 border-white shadow-lg flex items-center space-x-1 text-xs font-heading font-black">
-                        <Star className="w-4 h-4 text-amber-300 fill-amber-300" />
+                      <div className="absolute -top-2.5 -right-1.5 sm:-top-3 sm:-right-2 z-30 bg-emerald-600 text-white px-2 py-0.5 sm:px-2.5 sm:py-0.5 rounded-full border-2 border-white shadow-lg flex items-center space-x-1 text-[10px] sm:text-xs font-heading font-black">
+                        <Star className="w-3 h-3 sm:w-3.5 sm:h-3.5 text-amber-300 fill-amber-300" />
                         <span>{stars}/3</span>
                       </div>
                     )}
 
                     {/* Locked Island Padlock */}
                     {isLocked && (
-                      <div className="absolute -top-2 -right-2 z-30 bg-slate-800 text-slate-100 p-2 rounded-full border-2 border-white shadow-lg">
-                        <Lock className="w-4 h-4" />
+                      <div className="absolute -top-2 -right-1.5 sm:-top-2 sm:-right-2 z-30 bg-slate-800 text-slate-100 p-1.5 sm:p-2 rounded-full border-2 border-white shadow-lg">
+                        <Lock className="w-3 h-3 sm:w-3.5 sm:h-3.5" />
                       </div>
                     )}
                   </div>
 
                   {/* High-Contrast Floating Island Title Pill */}
-                  <div className="mt-2.5 bg-white/95 px-3.5 py-1.5 rounded-2xl border-2 border-amber-300 shadow-lg text-center max-w-[160px]">
-                    <span className="font-heading font-black text-xs sm:text-sm text-slate-900 block leading-tight">
+                  <div className="mt-1.5 sm:mt-2 bg-white/95 px-2.5 py-1 sm:px-3 sm:py-1.5 rounded-xl sm:rounded-2xl border-2 border-amber-300 shadow-md sm:shadow-lg text-center max-w-[136px] sm:max-w-[160px]">
+                    <span className="font-heading font-black text-[11px] sm:text-sm text-slate-900 block leading-tight truncate">
                       Pulau {island.name}
                     </span>
-                    <span className="text-[10px] font-heading font-bold text-orange-600 block truncate mt-0.5">
+                    <span className="text-[9px] sm:text-[10px] font-heading font-bold text-orange-600 block truncate mt-0.5">
                       {island.topicName}
                     </span>
                   </div>
