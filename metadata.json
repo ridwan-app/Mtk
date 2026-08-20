@@ -1,0 +1,6 @@
+{
+  "name": "Petualangan Matematika Nusantara",
+  "description": "Aplikasi belajar matematika interaktif anak SD berbasis Kurikulum Merdeka (Fase A, B, C) bertema petualangan pesawat menjelajah pulau-pulau Nusantara.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
