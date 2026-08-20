@@ -1098,6 +1098,8 @@ export const PetakJongkokDataGame: React.FC<GameProps> = ({ game, onBack, onRewa
 // -------------------------------------------------------------
 // 5. EGRANG BILANGAN BULAT (FASE B) - Number Line & Bamboo Stilts
 // -------------------------------------------------------------
+// 5. EGRANG BILANGAN CACAH (FASE B) - Stilt Walking Challenge
+// -------------------------------------------------------------
 export const EgrangBilanganBulatGame: React.FC<GameProps> = ({ game, onBack, onReward }) => {
   const [questionsList, setQuestionsList] = useState<MiniGameQuestion[]>(() =>
     shuffleArray(MINI_GAME_QUESTIONS[game.id] || [])
@@ -1113,12 +1115,12 @@ export const EgrangBilanganBulatGame: React.FC<GameProps> = ({ game, onBack, onR
 
   const targetFinish = 5;
   const currentQ: MiniGameQuestion = questionsList[currentIdx % questionsList.length] || {
-    id: 'eb-1',
+    id: 'ebb-1',
     gameId: game.id,
-    question: 'Posisi awal 2. Melangkah mundur 5 langkah. Posisi sekarang: 2 - 5 = ... 🎋',
-    options: [-3, -2, 3, 7],
-    answer: -3,
-    explanation: '2 - 5 = -3 pada garis bilangan.',
+    question: 'Nama bilangan dari 3.450 dibaca... 🎋',
+    options: ['Tiga ribu empat ratus lima puluh', 'Tiga ratus empat puluh lima', 'Tiga puluh empat lima puluh', 'Tiga ribu lima ratus empat puluh'],
+    answer: 'Tiga ribu empat ratus lima puluh',
+    explanation: '3 ribuan (tiga ribu) + 4 ratusan (empat ratus) + 5 puluhan (lima puluh) = Tiga ribu empat ratus lima puluh.',
   };
 
   const handleSelect = (val: string | number) => {
@@ -1148,7 +1150,7 @@ export const EgrangBilanganBulatGame: React.FC<GameProps> = ({ game, onBack, onR
       soundManager.playWrong();
       setIsWobbling(true);
       setTimeout(() => setIsWobbling(false), 800);
-      setStiltPosition((prev) => Math.max(-3, prev - 1));
+      setStiltPosition((prev) => Math.max(0, prev - 1));
     }
   };
 
@@ -1169,6 +1171,8 @@ export const EgrangBilanganBulatGame: React.FC<GameProps> = ({ game, onBack, onR
     setIsWobbling(false);
   };
 
+  const checkpointLabels = ['Mulai (0)', '1.000', '2.000', '3.000', '4.000', 'Finish (5.000)'];
+
   return (
     <div className="bg-white rounded-3xl p-4 sm:p-6 border-2 border-amber-200 shadow-xl space-y-5 max-w-4xl mx-auto">
       {/* Header */}
@@ -1183,7 +1187,7 @@ export const EgrangBilanganBulatGame: React.FC<GameProps> = ({ game, onBack, onR
           </button>
 
           <span className="text-xs font-heading font-black bg-amber-100 text-amber-950 px-3 py-1 rounded-full border border-amber-300">
-            🎋 Egrang Bilangan Bulat
+            🎋 Egrang Bilangan Cacah
           </span>
           <span className="text-xs font-heading font-black bg-emerald-100 text-emerald-950 px-3 py-1 rounded-full border border-emerald-300 flex items-center space-x-1">
             <Coins className="w-3.5 h-3.5 text-emerald-600" />
@@ -1193,8 +1197,8 @@ export const EgrangBilanganBulatGame: React.FC<GameProps> = ({ game, onBack, onR
 
         {/* Mascot Guide Header */}
         <KikoGameGuideHeader
-          gameName="Egrang Bilangan Bulat"
-          guideText="Jaga keseimbangan di atas egrang bambu! Langkah positif maju ke kanan, langkah negatif mundur ke kiri pada garis bilangan!"
+          gameName="Egrang Bilangan Cacah"
+          guideText="Jaga keseimbangan di atas egrang bambu! Kuasai nilai tempat dan urutan bilangan cacah hingga 5.000 untuk mencapai garis akhir!"
         />
       </div>
 
@@ -1202,21 +1206,21 @@ export const EgrangBilanganBulatGame: React.FC<GameProps> = ({ game, onBack, onR
       <div className="bg-gradient-to-b from-amber-100 to-orange-100 rounded-3xl p-5 border-2 border-amber-300 relative shadow-inner space-y-3">
         <div className="flex justify-between items-center text-xs font-heading font-black text-slate-700">
           <span className="flex items-center space-x-1">
-            <span>Garis Bilangan Egrang Bambu</span>
+            <span>Lintasan Egrang Bambu (Bilangan Cacah)</span>
             {isWobbling && <span className="text-rose-600 animate-bounce">⚠️ Egrang Goyang! Hilang Keseimbangan!</span>}
           </span>
           <span className="bg-white px-3 py-1 rounded-full border border-amber-300">
-            Posisi Egrang: [{stiltPosition > 0 ? `+${stiltPosition}` : stiltPosition}]
+            Posisi Pos: {checkpointLabels[stiltPosition] || `${stiltPosition * 1000}`}
           </span>
         </div>
 
         {/* Horizontal Bamboo Number Line */}
         <div className="h-32 bg-white/80 backdrop-blur-xs rounded-2xl border-2 border-amber-200 relative flex items-center justify-between px-6">
-          {[-5, -4, -3, -2, -1, 0, 1, 2, 3, 4, 5].map((num) => (
+          {[0, 1000, 2000, 3000, 4000, 5000].map((num, idx) => (
             <div key={num} className="flex flex-col items-center">
-              <div className={`w-0.5 ${num === 0 ? 'h-6 bg-red-600 w-1' : 'h-3 bg-slate-400'}`} />
-              <span className={`text-[10px] font-heading font-bold mt-1 ${num === 0 ? 'text-red-600 font-black' : 'text-slate-600'}`}>
-                {num}
+              <div className={`w-0.5 ${idx === 5 ? 'h-6 bg-emerald-600 w-1' : idx === 0 ? 'h-6 bg-red-600 w-1' : 'h-3 bg-slate-400'}`} />
+              <span className={`text-[10px] font-heading font-bold mt-1 ${idx === 5 ? 'text-emerald-700 font-black' : idx === 0 ? 'text-red-600 font-black' : 'text-slate-600'}`}>
+                {num.toLocaleString('id-ID')}
               </span>
             </div>
           ))}
@@ -1224,7 +1228,7 @@ export const EgrangBilanganBulatGame: React.FC<GameProps> = ({ game, onBack, onR
           {/* Stilt Walker on Number Line */}
           <motion.div
             animate={{
-              left: `${50 + stiltPosition * 8}%`,
+              left: `${8 + stiltPosition * 16.5}%`,
               rotate: isWobbling ? [-15, 15, -10, 0] : 0,
             }}
             transition={{ type: 'spring', stiffness: 200 }}
@@ -1250,7 +1254,7 @@ export const EgrangBilanganBulatGame: React.FC<GameProps> = ({ game, onBack, onR
             </h3>
           </div>
 
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 max-w-lg mx-auto">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 max-w-lg mx-auto">
             {currentQ.options.map((opt, idx) => (
               <button
                 key={idx}
@@ -1298,6 +1302,9 @@ export const EgrangBilanganBulatGame: React.FC<GameProps> = ({ game, onBack, onR
           <h3 className="text-2xl font-heading font-black text-slate-800">
             Luar Biasa! Egrang Sampai Garis Akhir Seimbang!
           </h3>
+          <p className="text-xs sm:text-sm text-slate-600 max-w-md mx-auto">
+            Hebat! Kamu telah menguasai nilai tempat dan bilangan cacah hingga 5.000 dengan langkah egrang bambu yang kokoh!
+          </p>
           <div className="inline-flex items-center space-x-2 bg-emerald-100 text-emerald-950 border border-emerald-300 px-5 py-2 rounded-2xl font-heading font-black text-sm">
             <Coins className="w-4 h-4 text-emerald-600" />
             <span>+{game.rewardCoins || 45} Koin Didapatkan!</span>
