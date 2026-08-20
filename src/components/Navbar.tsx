@@ -35,8 +35,16 @@ export const Navbar: React.FC<NavbarProps> = ({
             }}
             className="flex items-center space-x-2.5 sm:space-x-3 cursor-pointer group select-none shrink-0"
           >
-            <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-2xl bg-amber-400 border-2 border-amber-500 border-b-4 flex items-center justify-center text-slate-900 shadow-md group-hover:scale-105 transition-transform shrink-0">
-              <Plane className="w-6 h-6 transform -rotate-45" />
+            <div className="relative w-11 h-11 sm:w-13 sm:h-13 rounded-2xl bg-amber-100 border-2 border-amber-400 border-b-4 overflow-hidden shadow-md group-hover:scale-105 transition-transform shrink-0">
+              <img
+                src="/kiko-logo.jpg"
+                alt="Kiko Maskot"
+                className="w-full h-full object-cover"
+                referrerPolicy="no-referrer"
+              />
+              <div className="absolute bottom-0 right-0 w-4 h-4 bg-orange-500 rounded-tl-md flex items-center justify-center text-white text-[9px] shadow-xs">
+                ✈️
+              </div>
             </div>
             <div>
               <div className="flex items-center space-x-1.5">
