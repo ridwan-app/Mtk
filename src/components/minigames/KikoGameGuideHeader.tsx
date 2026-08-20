@@ -91,11 +91,11 @@ export const KikoGameGuideHeader: React.FC<KikoGameGuideHeaderProps> = ({
         }`}
       >
         {/* Kiko Avatar Icon (Topi Pilot & Kacamata) */}
-        <div className="relative w-8 h-8 rounded-full bg-gradient-to-br from-amber-300 to-orange-400 border-2 border-white shadow-2xs overflow-hidden flex items-center justify-center transform group-hover:scale-110 transition-transform shrink-0">
+        <div className="relative w-8 h-8 flex items-center justify-center transform group-hover:scale-110 transition-transform shrink-0">
           <img
-            src="/kiko-logo.jpg"
+            src="/logomtk.png"
             alt="Kiko Pilot"
-            className="w-full h-full object-cover"
+            className="w-full h-full object-contain"
             referrerPolicy="no-referrer"
           />
           {/* Animated pulse dot */}
@@ -133,11 +133,11 @@ export const KikoGameGuideHeader: React.FC<KikoGameGuideHeaderProps> = ({
             {/* Balloon Header */}
             <div className="flex items-center justify-between border-b border-amber-100 pb-2">
               <div className="flex items-center space-x-2">
-                <div className="w-8 h-8 rounded-full overflow-hidden border-2 border-amber-300 shadow-2xs shrink-0">
+                <div className="w-8 h-8 shrink-0 flex items-center justify-center">
                   <img
-                    src="/kiko-logo.jpg"
+                    src="/logomtk.png"
                     alt="Kiko Maskot"
-                    className="w-full h-full object-cover"
+                    className="w-full h-full object-contain"
                     referrerPolicy="no-referrer"
                   />
                 </div>
